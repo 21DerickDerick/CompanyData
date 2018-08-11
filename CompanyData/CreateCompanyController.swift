@@ -11,11 +11,17 @@ import CoreData
 
 protocol CreateCompanyControllerDelegate {
     func didAddCompany(company: Company)
+    func didEditCompany(company: Company)
 }
 
 class CreateCompanyController: UIViewController {
 
     var delegate: CreateCompanyControllerDelegate?
+    var company: Company? {
+        didSet{
+            nameTextField.text = company?.name
+        }
+    }
     
     let nameLabel: UILabel = {
         let label = UILabel()
@@ -32,6 +38,12 @@ class CreateCompanyController: UIViewController {
         return textField
     }()
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        navigationItem.title = company == nil ? "Create Company" : "Edit Company"
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -45,12 +57,18 @@ class CreateCompanyController: UIViewController {
     @objc private func handleSave() {
         print("Attempting to save data...")
         
-//        let context = persistentContainer.viewContext
-        
+        if company == nil {
+            createCompany()
+        } else {
+            saveCompanyChanges()
+        }
+    }
+    
+    // MARK: - Methods
+    
+    private func createCompany() {
         let context = CoreDataManager.shared.persistenceContainer.viewContext
-        
         let company = NSEntityDescription.insertNewObject(forEntityName: "Company", into: context)
-        
         company.setValue(nameTextField.text, forKey: "name")
         
         // Perform the save
@@ -66,20 +84,29 @@ class CreateCompanyController: UIViewController {
         } catch let saveErr {
             print("Failed to save company: \(saveErr)")
         }
-        
-//        dismiss(animated: true) {
-//            guard let name =  self.nameTextField.text else { return }
-//            let company = Company(name: name, founded: Date())
-//            self.delegate?.didAddCompany(company: company)
-//        }
     }
+
+    private func saveCompanyChanges() {
+        let context = CoreDataManager.shared.persistenceContainer.viewContext
+        
+        company?.name = nameTextField.text
+        
+        do {
+            try context.save()
+            dismiss(animated: true) {
+                self.delegate?.didEditCompany(company: self.company!)
+            }
+        } catch let updateErr {
+            print("Failed to update company: \(updateErr)")
+        }
+        
+    }
+    
 }
 
 extension CreateCompanyController {
     private func setupUI() -> Void {
         view.backgroundColor = UIColor.darkBlue
-        
-        navigationItem.title = "Create Company"
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(title: "Cancel", style: .plain, target: self, action: #selector(handleCancel))
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Save", style: .plain, target: self, action: #selector(handleSave))
